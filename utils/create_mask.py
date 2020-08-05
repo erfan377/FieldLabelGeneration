@@ -13,6 +13,9 @@ import csv
 import matplotlib.pyplot as plt
 from PIL import Image
 
+base_dir = 'data/sentinel/'
+csv_file = base_dir + 'sentinel_locations.csv' if len(sys.argv) < 2 else sys.argv[1]
+json_filenames = [base_dir + 'json_polys/' + f for f in os.listdir(base_dir + 'json_polys/')] if len(sys.argv) < 2 else sys.argv[1]
 
 def read_csv(csv_file):
   grid = dict()
@@ -56,10 +59,7 @@ def scale_coords(shape_size, geom, grid, index, size_m = 450):
   return True, np.concatenate([scaled_x[:,None], scaled_y[:,None]],axis=1)
 
 
-base_dir = 'data/sentinel/'
 
-csv_file = base_dir + 'sentinel_locations.csv' if len(sys.argv) < 2 else sys.argv[1]
-json_file = base_dir + 'json_files/' + 'pyshp-all-2000-sentinel.json' if len(sys.argv) < 3 else sys.argv[2]  
 with open(json_file) as f:
   shp_dict = json.load(f)
 
