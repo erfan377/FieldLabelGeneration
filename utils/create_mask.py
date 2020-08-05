@@ -16,6 +16,7 @@ from PIL import Image
 base_dir = 'data/sentinel/'
 csv_file = base_dir + 'sentinel_locations.csv' if len(sys.argv) < 2 else sys.argv[1]
 json_filenames = [base_dir + 'json_polys/' + f for f in os.listdir(base_dir + 'json_polys/')] if len(sys.argv) < 2 else sys.argv[1]
+orig_images_dir = 'inel_tf/Land_parcels_france_Sentinel2_3mo_comp_s2_median_fr_apr_jun_ee_export/'
 
 def read_csv(csv_file):
   grid = dict()
