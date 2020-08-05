@@ -2,7 +2,7 @@
 Expects a csv file with parcel id, maxlat, maxlon, minlat, minlon of each satellite image
 Expects a json file with the polygons parsed from the shapefile 
 
-Run python utils/create_mask.py [csv_file_path] [json_file_path]
+Run python utils/create_mask.py [csv_file_path] [json_file_folder]
 """
 
 import json
@@ -86,6 +86,7 @@ shape_size = (224, 224)
 grid = read_csv(csv_file)
 create_empty_masks(grid, shape_size)
 
+count_parcels = defaultdict(int)
 num_json_files_parsed = 0
 num_fields_parsed = 0
 # read multiple json files
