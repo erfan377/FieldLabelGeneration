@@ -129,3 +129,10 @@ for json_file in json_filenames:
           cv2.polylines(orig_image, polys, True, color=(255,255,255),thickness=2)
           cv2.imwrite(overlay_path, orig_image)
           print('saved image ', image_id)
+
+# save a small summery of number of parcels in each image
+with open(base_dir + 'parcel_in_image_count.csv', 'w') as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerow(['image_ID', 'count'])
+    for key, value in count_parcels.items():
+        writer.writerow([int(key), value])
