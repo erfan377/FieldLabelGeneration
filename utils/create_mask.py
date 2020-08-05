@@ -40,7 +40,7 @@ def read_csv(csv_file):
         grid[index] = dict()
         for key in keys:
           grid[index][key] = 0
-      grid[index]['Parcel_id'] = float(row[0])  #SENTINEL
+      grid[index]['image_id'] = int(row[0])  #SENTINEL
       
 
       # Sentinel
@@ -55,13 +55,13 @@ def read_csv(csv_file):
 # CSV file, so the empty masks to be overwritten later
 def create_empty_masks(grid, shape_size):
     for index in range(len(grid.keys())):
-        image_id = grid[index]['Image_id']
+        image_id = grid[index]['image_id']
         mask = np.zeros(shape_size)
-        cv2.imwrite(base_dir + 'masks/'+ str(int(image_id)) + '.png', np.array(mask))
-        cv2.imwrite(base_dir + 'masks_filled/' + str(int(image_id)) + '.png', np.array(mask))
-        im_name = base_dir + orig_images_dir + str(int(image_id)) +'.jpeg'
+        cv2.imwrite(base_dir + 'masks/'+ str(image_id) + '.png', np.array(mask))
+        cv2.imwrite(base_dir + 'masks_filled/' + str(image_id) + '.png', np.array(mask))
+        im_name = base_dir + orig_images_dir + str(image_id) +'.jpeg'
         orig_image = cv2.imread(im_name)
-        overlay_path = base_dir + 'overlay/' + str(int(image_id)) + '.jpeg'
+        overlay_path = base_dir + 'overlay/' + str(image_id) + '.jpeg'
         cv2.imwrite(overlay_path, orig_image)
              
 def point_is_in_bounds(point, w, h):
@@ -82,42 +82,50 @@ def scale_coords(shape_size, geom, grid, index, size_m = 450):
      return False, np.concatenate([scaled_x[:,None], scaled_y[:,None]],axis=1)
   return True, np.concatenate([scaled_x[:,None], scaled_y[:,None]],axis=1)
 
-
-
-with open(json_file) as f:
-  shp_dict = json.load(f)
-
 shape_size = (224, 224)
 grid = read_csv(csv_file)
 create_empty_masks(grid, shape_size)
 
-for index in range(len(grid.keys())):
-  parcel_id = grid[index]['Parcel_id']
-  polys = []
-  for sh_index, sh in enumerate(shp_dict['features']):
-    for coord_idx in range(len(sh['geometry']['coordinates'])):
-      geom = np.array(sh['geometry']['coordinates'][coord_idx])
-      is_in_bounds, geom_fixed = scale_coords(shape_size, geom, grid, index)
-      pts = geom_fixed.astype(int)
-      polys.append(pts)
+num_json_files_parsed = 0
+num_fields_parsed = 0
+# read multiple json files
+for json_file in json_filenames:
+    print('Read json')
+    # open the saved json file for the found parcels in the images 
+    with open(json_file) as f:
+      shp_dict = json.load(f)
+      num_json_files_parsed += 1
+    #create dictionary of polygons in each image for fast iindexing
+    parcels_dict = create_dict_parcels(grid, shp_dict)
+    # find the polygons of each image and plot them
+    for index in range(len(grid.keys())):
+      image_id = grid[index]['image_id']
+      polys = []
+      if image_id in parcels_dict:
+          for sh_index, sh in enumerate(parcels_dict[image_id]):
+              count_parcels[image_id] += 1 
+              for coord_idx in range(len(sh['geometry']['coordinates'])):
+                  geom = np.array(sh['geometry']['coordinates'][coord_idx])
+                  is_in_bounds, geom_fixed = scale_coords(shape_size, geom, grid, index)
+                  pts = geom_fixed.astype(int)
+                  polys.append(pts)
 
-  #Creates the binary mask
-  mask = np.zeros(shape_size)
-  cv2.polylines(mask, polys, True, color=255,thickness=2)
+          #Saves the binary mask file
+          mask_path = base_dir + 'masks/' + str(image_id) + '.png'
+          mask_line = cv2.imread(mask_path, cv2.IMREAD_UNCHANGED)
+          cv2.polylines(mask_line, polys, True, color=255,thickness=2)
+          cv2.imwrite(mask_path, mask_line)
+        
+          #Saves the binary mask filled file
+          mask_filled_path = base_dir + 'masks_filled/' + str(image_id) + '.png'
+          mask_filled = cv2.imread(mask_filled_path, cv2.IMREAD_UNCHANGED)
+          cv2.fillPoly(mask_filled, polys, color=255)
+          cv2.polylines(mask_filled, polys, True, color=0,thickness=2)
+          cv2.imwrite(mask_filled_path, mask_filled)
 
-  #Saves the binary mask file
-  cv2.imwrite(base_dir + 'masks/image_binary_' + str(int(parcel_id)) + '.png', np.array(mask))
-
-  #Saves the binary mask filled file
-  mask = np.zeros(shape_size)
-  cv2.fillPoly(mask, polys, color=255)
-  cv2.polylines(mask, polys, True, color=0,thickness=2)
-  cv2.imwrite(base_dir + 'masks_filled/image_binary_' + str(int(parcel_id)) + '.png', np.array(mask))
-  
-  #Saves the overlay file
-  im_name = base_dir + 'rgb_image/SENTINEL_' + str(int(parcel_id)) +'.jpeg'
-  print(im_name)
-  orig_image = cv2.imread(im_name)
-  cv2.polylines(orig_image, polys, True, color=(255,255,255),thickness=2)
-  cv2.imwrite(base_dir + 'overlay/image_overlay_' + str(int(parcel_id)) + '.jpeg', orig_image)
-  
+          #Saves the overlay file
+          overlay_path = base_dir + 'overlay/' + str(image_id) + '.jpeg'
+          orig_image = cv2.imread(overlay_path)
+          cv2.polylines(orig_image, polys, True, color=(255,255,255),thickness=2)
+          cv2.imwrite(overlay_path, orig_image)
+          print('saved image ', image_id)
