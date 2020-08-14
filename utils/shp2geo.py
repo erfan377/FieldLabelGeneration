@@ -122,7 +122,11 @@ def dump_shp_to_json(shape_file, grid, output_json='./data/pyshp-all-2000-sentin
     shp_geom = shape(geom)
     intersect_bool, intersect_res  = check_polygon_in_bounds(shp_geom, tree)
     if intersect_bool:
-      num_matched += 1
+      list_image_ids = []
+      for element in intersect_res:
+          list_image_ids.append(element.name)
+          count_parcels[element.name] += 1
+          num_matched += 1
       print(int(sr.record[0]))
       atr = dict(zip(field_names, sr.record))
       geom['coordinates'] = listit(geom['coordinates'])
