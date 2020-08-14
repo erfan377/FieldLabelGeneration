@@ -69,23 +69,6 @@ def read_centroid(original, destination, centroid_txt):
       grid[index]['poly'] = transform(project, grid[index]['poly'])
   return grid
 
-def is_in_parcelID_window(chosen_parcel_id, parcel_ids):
-  for parcel_id in parcel_ids:
-    if abs(chosen_parcel_id - parcel_id) == 0:
-      return True
-    if parcel_id > chosen_parcel_id + 20:
-      return False
-  return False
-
-def get_sliding_parcelID_window(grid):
-  parcel_ids = set()
-  for index in grid:
-    parcel_id = int(grid[index]['Parcel_id'])
-    for i in range(parcel_id - 20, parcel_id + 20):
-      parcel_ids.add(parcel_id)
-  print(len(parcel_ids))
-  return sorted(list(parcel_ids))
-
 def listit(t):
   return list(map(listit, t)) if isinstance(t, (list, tuple)) else t
 
