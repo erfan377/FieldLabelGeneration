@@ -87,10 +87,11 @@ def scale_coords(shape_size, geom, grid, index, size_m = 450):
     return True
   return False
 
-def check_polygon_in_bounds(poly, grid):
-  for index in grid:
-    if poly.intersects(grid[index]['poly']) or grid[index]['poly'].contains(poly):
-      return True
+def check_polygon_in_bounds(poly, tree):
+  results = tree.query(poly)
+  if len(results) != 0:
+    return True, results
+  return False, results
 
   return False
 
@@ -119,8 +120,8 @@ def dump_shp_to_json(shape_file, grid, output_json='./data/pyshp-all-2000-sentin
     index += 1
     geom = sr.shape.__geo_interface__
     shp_geom = shape(geom)
-
-    if check_polygon_in_bounds(shp_geom, grid):
+    intersect_bool, intersect_res  = check_polygon_in_bounds(shp_geom, tree)
+    if intersect_bool:
       num_matched += 1
       print(int(sr.record[0]))
       atr = dict(zip(field_names, sr.record))
