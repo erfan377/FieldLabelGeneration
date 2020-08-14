@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 def read_csv(original, destination, csv_file='./data/img_bbox.csv'):
   grid = dict()
   keys = ['maxlat', 'maxlon', 'minlat', 'minlon']
+  poly_list = []
   with open(csv_file) as f:
     readCSV = csv.reader(f)
     for index, row in enumerate(readCSV, -1):
@@ -26,8 +27,8 @@ def read_csv(original, destination, csv_file='./data/img_bbox.csv'):
         grid[index] = dict()
         for key in keys:
           grid[index][key] = 0
-      grid[index]['Parcel_id'] = float(row[0])  #SENTINEL
-
+      grid[index]['Image_id'] = float(row[0])  #SENTINEL
+      
       # Sentinel
       maxlat = float(row[1])
       maxlon = float(row[2])
@@ -37,7 +38,11 @@ def read_csv(original, destination, csv_file='./data/img_bbox.csv'):
       grid[index]['poly'] = shapely.geometry.box(minlat, minlon, maxlat, maxlon) #Polygon([(minlon, minlat), (minlon, maxlat), (maxlon, maxlat),(maxlon, minlat)])
       project = partial(pyproj.transform, original, destination)
       grid[index]['poly'] = transform(project, grid[index]['poly'])
-  return grid
+      poly_obj = grid[index]['poly']
+      poly_obj.name = int(grid[index]['Image_id'])
+      poly_list.append(poly_obj)
+  tree = STRtree(poly_list)
+  return grid, tree
 
 def read_centroid(original, destination, centroid_txt): 
   grid = dict()
