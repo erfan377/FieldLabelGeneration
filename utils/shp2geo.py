@@ -108,6 +108,7 @@ def dump_shp_to_json(shape_file, grid, output_json='./data/pyshp-all-2000-sentin
   destination = Proj('epsg:4326')
   fields = reader.fields[1:]
   field_names = [field[0] for field in fields]
+  field_names.append('IMAGE_ID')
   buffer = []
   index = 0
   num_matched = 0
@@ -129,6 +130,7 @@ def dump_shp_to_json(shape_file, grid, output_json='./data/pyshp-all-2000-sentin
           num_matched += 1
       print(int(sr.record[0]))
       atr = dict(zip(field_names, sr.record))
+      sr.record.append(list_image_ids)
       geom['coordinates'] = listit(geom['coordinates'])
       for index_coord in range(0, len(geom['coordinates'])):
         for counter in range(0,len(geom['coordinates'][index_coord])):
