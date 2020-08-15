@@ -11,7 +11,9 @@ from shapely.geometry import Polygon
 from shapely.geometry import shape
 from functools import partial
 from shapely.ops import transform
+from shapely.strtree import STRtree
 import matplotlib.pyplot as plt
+from collections import defaultdict
 
 
 def read_csv(original, destination, csv_file='./data/img_bbox.csv'):
