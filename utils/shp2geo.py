@@ -113,6 +113,8 @@ def dump_shp_to_json(shape_file, grid, output_json='./data/pyshp-all-2000-sentin
   buffer = []
   index = 0
   num_matched = 0
+  failed_projection = 0
+  count_parcels = defaultdict(int)
   #parcel_ids = get_sliding_parcelID_window(grid)
 
   project = partial(pyproj.transform, original, destination)
@@ -133,18 +135,23 @@ def dump_shp_to_json(shape_file, grid, output_json='./data/pyshp-all-2000-sentin
       atr = dict(zip(field_names, sr.record))
       sr.record.append(list_image_ids)
       geom['coordinates'] = listit(geom['coordinates'])
-      if len(geom['coordinates']) == 1: #for single polygon
-          counter_method1 += 1
-          x,y = zip(*geom['coordinates'][0])
-          lat, long = original(x, y, inverse=True) #coordinate transformation
-          geom['coordinates'] = [listit(list(zip(lat, long)))]
-      else: # for multipolygons
-          counter_method2 += 1
-          for index_coord in range(0, len(geom['coordinates'])):
-            for counter in range(0,len(geom['coordinates'][index_coord])):
-              x, y = geom['coordinates'][index_coord][counter]
-              lat, long = original(x, y, inverse=True) #coordinate transformation
-              geom['coordinates'][index_coord][counter] = [lat, long] #(long, lat)
+      try:
+        if len(geom['coordinates']) == 1: #for single polygon
+            counter_method1 += 1
+            x,y = zip(*geom['coordinates'][0])
+            lat, long = original(x, y, inverse=True) #coordinate transformation
+            geom['coordinates'] = [listit(list(zip(lat, long)))]
+        else: # for multipolygons
+            counter_method2 += 1
+            for index_coord in range(0, len(geom['coordinates'])):
+              for counter in range(0,len(geom['coordinates'][index_coord])):
+                x, y = geom['coordinates'][index_coord][counter]
+                lat, long = original(x, y, inverse=True) #coordinate transformation
+                geom['coordinates'][index_coord][counter] = [lat, long] #(long, lat)
+      except:
+        failed_projection =+ 1
+        print('failed count', failed_projection)
+        print(geom['coordinates'])
       print("Matched:" + str(index))
       print(sr.record[0])
       print("Number matched:", num_matched)
