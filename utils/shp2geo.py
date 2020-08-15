@@ -56,7 +56,7 @@ def read_centroid(original, destination, centroid_txt):
         grid[index] = dict()
         for key in keys:
           grid[index][key] = 0
-      grid[index]['Parcel_id'] = float(row[0])  #SENTINEL
+      grid[index]['Image_id'] = float(row[0])  #SENTINEL
 
       # Sentinel
       maxlat = float(row[1])
@@ -101,7 +101,7 @@ def point_is_in_bounds(point, bound):
   return False
 
 # read the shapefile
-def dump_shp_to_json(shape_file, grid, output_json='./data/pyshp-all-2000-sentinel-new-json'):
+def dump_shp_to_json(shape_file, grid, tree, output_json='./data/pyshp-all-2000-sentinel-new-json'):
   reader = shapefile.Reader(shape_file)
   original = Proj(fiona.open(shape_file).crs)
   print(fiona.open(shape_file).crs)
@@ -157,17 +157,26 @@ def dump_shp_to_json(shape_file, grid, output_json='./data/pyshp-all-2000-sentin
       print("Number matched:", num_matched)
       buffer.append(dict(type="Feature", geometry=geom, properties=atr))
   # write the GeoJSON file
-  geojson = open(output_json, "w")
-  geojson.write(dumps({"type": "FeatureCollection",\
-  "features": buffer}, indent=2) + "\n")
-  geojson.close()
+  output_json_interval = output_json + str(num_matched) + '.json'
+  print("saving json \n")
+  with open(output_json_interval, 'w') as geojson:
+    geojson.write(dumps({"type": "FeatureCollection", "features": buffer}, indent=2) + "\n")
+    geojson.close()
+    print('saved', output_json_interval)
+  
+  print('method one count:', counter_method1)
+  print('method two count:', counter_method2)
+  print("Number matched:", num_matched)
+  print('failed count', failed_projection)
 
 
-csv_file = './data/img_csv.csv'
-shape_file = './data/RPG_2-0__SHP_LAMB93_FR-2017_2017-01-01/RPG/1_DONNEES_LIVRAISON_2017/RPG_2-0_SHP_LAMB93_FR-2017/PARCELLES_GRAPHIQUES.shp'
+ase_dir = 'data/planet/'
+csv_file = base_dir + '/img_csv.csv'
+shape_file = './data/RPG_2-0__SHP_LAMB93_FR-2018_2018-01-15/RPG/1_DONNEES_LIVRAISON_2018/RPG_2-0_SHP_LAMB93_FR-2018/PARCELLES_GRAPHIQUES.shp'
+if os.path.exists(base_dir + 'json_polys/') == False:
+    os.makedirs(base_dir + 'json_polys/')
 original = Proj(fiona.open(shape_file).crs)
-print(original)
 destination = Proj('epsg:4326')
 reader = shapefile.Reader(shape_file)
-grid = read_csv(destination, original, csv_file)
-dump_shp_to_json(shape_file, grid)
+grid, tree = read_csv(destination, original, csv_file)
+dump_shp_to_json(shape_file, grid, tree, base_dir + 'json_polys/pyshp_2000_sentinel_new_json_matched_')
