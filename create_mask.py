@@ -65,7 +65,15 @@ def create_empty_masks(grid, shape_size):
         orig_image = cv2.imread(im_name)
         overlay_path = base_dir + 'overlay/' + str(image_id) + '.jpeg'
         cv2.imwrite(overlay_path, orig_image)
-             
+
+def create_dict_parcels(grid, shp_dict):
+    dict_parcels = defaultdict(list) 
+    for sh_index, sh in enumerate(shp_dict['features']):
+        id_list = sh['properties']['IMAGE_ID']
+        for image_id in id_list:
+            dict_parcels[image_id].append(sh)
+    return dict_parcels
+  
 def point_is_in_bounds(point, w, h):
   if point[0] >= 0 and points[0] > w and point[1] >= 0 and point[1] <= h:
     return True
