@@ -11,12 +11,15 @@ from shapely.geometry import Polygon
 from shapely.geometry import shape
 from functools import partial
 from shapely.ops import transform
+from shapely.strtree import STRtree
 import matplotlib.pyplot as plt
+from collections import defaultdict
 
 
 def read_csv(original, destination, csv_file='./data/img_bbox.csv'):
   grid = dict()
   keys = ['maxlat', 'maxlon', 'minlat', 'minlon']
+  poly_list = []
   with open(csv_file) as f:
     readCSV = csv.reader(f)
     for index, row in enumerate(readCSV, -1):
@@ -26,8 +29,8 @@ def read_csv(original, destination, csv_file='./data/img_bbox.csv'):
         grid[index] = dict()
         for key in keys:
           grid[index][key] = 0
-      grid[index]['Parcel_id'] = float(row[0])  #SENTINEL
-
+      grid[index]['Image_id'] = float(row[0])  #SENTINEL
+      
       # Sentinel
       maxlat = float(row[1])
       maxlon = float(row[2])
@@ -37,7 +40,11 @@ def read_csv(original, destination, csv_file='./data/img_bbox.csv'):
       grid[index]['poly'] = shapely.geometry.box(minlat, minlon, maxlat, maxlon) #Polygon([(minlon, minlat), (minlon, maxlat), (maxlon, maxlat),(maxlon, minlat)])
       project = partial(pyproj.transform, original, destination)
       grid[index]['poly'] = transform(project, grid[index]['poly'])
-  return grid
+      poly_obj = grid[index]['poly']
+      poly_obj.name = int(grid[index]['Image_id'])
+      poly_list.append(poly_obj)
+  tree = STRtree(poly_list)
+  return grid, tree
 
 def read_centroid(original, destination, centroid_txt): 
   grid = dict()
@@ -51,7 +58,7 @@ def read_centroid(original, destination, centroid_txt):
         grid[index] = dict()
         for key in keys:
           grid[index][key] = 0
-      grid[index]['Parcel_id'] = float(row[0])  #SENTINEL
+      grid[index]['Image_id'] = float(row[0])  #SENTINEL
 
       # Sentinel
       maxlat = float(row[1])
@@ -63,23 +70,6 @@ def read_centroid(original, destination, centroid_txt):
       project = partial(pyproj.transform, original, destination)
       grid[index]['poly'] = transform(project, grid[index]['poly'])
   return grid
-
-def is_in_parcelID_window(chosen_parcel_id, parcel_ids):
-  for parcel_id in parcel_ids:
-    if abs(chosen_parcel_id - parcel_id) == 0:
-      return True
-    if parcel_id > chosen_parcel_id + 20:
-      return False
-  return False
-
-def get_sliding_parcelID_window(grid):
-  parcel_ids = set()
-  for index in grid:
-    parcel_id = int(grid[index]['Parcel_id'])
-    for i in range(parcel_id - 20, parcel_id + 20):
-      parcel_ids.add(parcel_id)
-  print(len(parcel_ids))
-  return sorted(list(parcel_ids))
 
 def listit(t):
   return list(map(listit, t)) if isinstance(t, (list, tuple)) else t
@@ -99,10 +89,11 @@ def scale_coords(shape_size, geom, grid, index, size_m = 450):
     return True
   return False
 
-def check_polygon_in_bounds(poly, grid):
-  for index in grid:
-    if poly.intersects(grid[index]['poly']) or grid[index]['poly'].contains(poly):
-      return True
+def check_polygon_in_bounds(poly, tree):
+  results = tree.query(poly)
+  if len(results) != 0:
+    return True, results
+  return False, results
 
   return False
 
@@ -112,16 +103,20 @@ def point_is_in_bounds(point, bound):
   return False
 
 # read the shapefile
-def dump_shp_to_json(shape_file, grid, output_json='./data/pyshp-all-2000-sentinel-new-json'):
+def dump_shp_to_json(shape_file, grid, tree, output_json='./data/pyshp-all-2000-sentinel-new-json'):
   reader = shapefile.Reader(shape_file)
   original = Proj(fiona.open(shape_file).crs)
   print(fiona.open(shape_file).crs)
   destination = Proj('epsg:4326')
   fields = reader.fields[1:]
   field_names = [field[0] for field in fields]
+  field_names.append('IMAGE_ID')
+  project = partial(pyproj.transform, original, destination)
   buffer = []
   index = 0
   num_matched = 0
+  failed_projection = 0
+  count_parcels = defaultdict(int)
   #parcel_ids = get_sliding_parcelID_window(grid)
 
   project = partial(pyproj.transform, original, destination)
@@ -131,33 +126,59 @@ def dump_shp_to_json(shape_file, grid, output_json='./data/pyshp-all-2000-sentin
     index += 1
     geom = sr.shape.__geo_interface__
     shp_geom = shape(geom)
-
-    if check_polygon_in_bounds(shp_geom, grid):
-      num_matched += 1
+    intersect_bool, intersect_res  = check_polygon_in_bounds(shp_geom, tree)
+    if intersect_bool:
+      list_image_ids = []
+      for element in intersect_res:
+          list_image_ids.append(element.name)
+          count_parcels[element.name] += 1
+          num_matched += 1
       print(int(sr.record[0]))
       atr = dict(zip(field_names, sr.record))
+      sr.record.append(list_image_ids)
       geom['coordinates'] = listit(geom['coordinates'])
-      for index_coord in range(0, len(geom['coordinates'])):
-        for counter in range(0,len(geom['coordinates'][index_coord])):
-          x, y = geom['coordinates'][index_coord][counter]
-          long, lat = pyproj.transform (original , destination, x, y)
-          geom['coordinates'][index_coord][counter] = [lat, long] #(long, lat)
+      try:
+        if len(geom['coordinates']) == 1: #for single polygon
+            counter_method1 += 1
+            x,y = zip(*geom['coordinates'][0])
+            lat, long = original(x, y, inverse=True) #coordinate transformation
+            geom['coordinates'] = [listit(list(zip(lat, long)))]
+        else: # for multipolygons
+            counter_method2 += 1
+            for index_coord in range(0, len(geom['coordinates'])):
+              for counter in range(0,len(geom['coordinates'][index_coord])):
+                x, y = geom['coordinates'][index_coord][counter]
+                lat, long = original(x, y, inverse=True) #coordinate transformation
+                geom['coordinates'][index_coord][counter] = [lat, long] #(long, lat)
+      except:
+        failed_projection =+ 1
+        print('failed count', failed_projection)
+        print(geom['coordinates'])
       print("Matched:" + str(index))
       print(sr.record[0])
       print("Number matched:", num_matched)
       buffer.append(dict(type="Feature", geometry=geom, properties=atr))
   # write the GeoJSON file
-  geojson = open(output_json, "w")
-  geojson.write(dumps({"type": "FeatureCollection",\
-  "features": buffer}, indent=2) + "\n")
-  geojson.close()
+  output_json_interval = output_json + str(num_matched) + '.json'
+  print("saving json \n")
+  with open(output_json_interval, 'w') as geojson:
+    geojson.write(dumps({"type": "FeatureCollection", "features": buffer}, indent=2) + "\n")
+    geojson.close()
+    print('saved', output_json_interval)
+  
+  print('method one count:', counter_method1)
+  print('method two count:', counter_method2)
+  print("Number matched:", num_matched)
+  print('failed count', failed_projection)
 
 
-csv_file = './data/img_csv.csv'
-shape_file = './data/RPG_2-0__SHP_LAMB93_FR-2017_2017-01-01/RPG/1_DONNEES_LIVRAISON_2017/RPG_2-0_SHP_LAMB93_FR-2017/PARCELLES_GRAPHIQUES.shp'
+ase_dir = 'data/planet/'
+csv_file = base_dir + '/img_csv.csv'
+shape_file = './data/RPG_2-0__SHP_LAMB93_FR-2018_2018-01-15/RPG/1_DONNEES_LIVRAISON_2018/RPG_2-0_SHP_LAMB93_FR-2018/PARCELLES_GRAPHIQUES.shp'
+if os.path.exists(base_dir + 'json_polys/') == False:
+    os.makedirs(base_dir + 'json_polys/')
 original = Proj(fiona.open(shape_file).crs)
-print(original)
 destination = Proj('epsg:4326')
 reader = shapefile.Reader(shape_file)
-grid = read_csv(destination, original, csv_file)
-dump_shp_to_json(shape_file, grid)
+grid, tree = read_csv(destination, original, csv_file)
+dump_shp_to_json(shape_file, grid, tree, base_dir + 'json_polys/pyshp_2000_sentinel_new_json_matched_')
