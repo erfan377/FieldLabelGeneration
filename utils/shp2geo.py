@@ -17,6 +17,17 @@ from collections import defaultdict
 
 
 def read_csv(original, destination, csv_file='./data/img_bbox.csv'):
+  """Read the coordinate of the bounding boxes and constructs and R-Tree data structure
+
+  Args:
+      original : coordinate system to project from
+      destination : coordinate system to project to
+      csv_file (str, optional): csv containing bounding boxes. The path is usually given before.
+
+  Returns:
+    dict, r-tree: dict of bounding boxes for each image id and r-tree
+  """
+  
   grid = dict()
   keys = ['maxlat', 'maxlon', 'minlat', 'minlon']
   poly_list = []
@@ -29,9 +40,8 @@ def read_csv(original, destination, csv_file='./data/img_bbox.csv'):
         grid[index] = dict()
         for key in keys:
           grid[index][key] = 0
-      grid[index]['Image_id'] = float(row[0])  #SENTINEL
+      grid[index]['Image_id'] = int(row[0])
       
-      # Sentinel
       maxlat = float(row[1])
       maxlon = float(row[2])
       minlat = float(row[3])
@@ -40,67 +50,35 @@ def read_csv(original, destination, csv_file='./data/img_bbox.csv'):
       grid[index]['poly'] = shapely.geometry.box(minlat, minlon, maxlat, maxlon) #Polygon([(minlon, minlat), (minlon, maxlat), (maxlon, maxlat),(maxlon, minlat)])
       project = partial(pyproj.transform, original, destination)
       grid[index]['poly'] = transform(project, grid[index]['poly'])
+      
+      #populating r-tree
       poly_obj = grid[index]['poly']
-      poly_obj.name = int(grid[index]['Image_id'])
+      poly_obj.name = grid[index]['Image_id'] #useful fore retrival in search phase
       poly_list.append(poly_obj)
-  tree = STRtree(poly_list)
+  tree = STRtree(poly_list) #constructing R-Tree
   return grid, tree
 
-def read_centroid(original, destination, centroid_txt): 
-  grid = dict()
-  keys = ['maxlat', 'maxlon', 'minlat', 'minlon']
-  with open(csv_file) as f:
-    readCSV = csv.reader(f)
-    for index, row in enumerate(readCSV, -1):
-      if index == -1:
-        continue
-      if index not in grid:
-        grid[index] = dict()
-        for key in keys:
-          grid[index][key] = 0
-      grid[index]['Image_id'] = float(row[0])  #SENTINEL
-
-      # Sentinel
-      maxlat = float(row[1])
-      maxlon = float(row[2])
-      minlat = float(row[3])
-      minlon = float(row[4])
-
-      grid[index]['poly'] = shapely.geometry.box(minlat, minlon, maxlat, maxlon) 
-      project = partial(pyproj.transform, original, destination)
-      grid[index]['poly'] = transform(project, grid[index]['poly'])
-  return grid
-
 def listit(t):
+  # conveert to appropriate list type 
   return list(map(listit, t)) if isinstance(t, (list, tuple)) else t
 
-def scale_coords(shape_size, geom, grid, index, size_m = 450):
-  w, h = shape_size
-  min_lat, min_lon, max_lat, max_lon = grid[index]['minlat'], grid[index]['minlon'], grid[index]['maxlat'], grid[index]['maxlon']
-  x = geom[:,0]
-  y = geom[:,1]
-  w = 224
-  h = 224
-  scale_lon = w/(max_lon - min_lon)
-  scale_lat = h/(max_lat-min_lat)
-  scaled_x = (x - min_lon) * scale_lon # lon-> x, lat->y
-  scaled_y = h - ((y - min_lat) * scale_lat)
-  if any(point_is_in_bounds(val, w) for val in scaled_x) and any(point_is_in_bounds(val,h) for val in scaled_y):
-    return True
-  return False
 
 def check_polygon_in_bounds(poly, tree):
+  """
+  find image corrspinding to the existance of a field in the list of 
+  image bounding boxes
+
+  Args:
+      poly (polygon): field
+      tree (r-tree): r-tree of images
+
+  Returns:
+      Bool, List: List of intersecting images with a field
+  """
   results = tree.query(poly)
   if len(results) != 0:
     return True, results
   return False, results
-
-  return False
-
-def point_is_in_bounds(point, bound):
-  if point >= 0 and point <= bound:
-    return True
-  return False
 
 # read the shapefile
 def dump_shp_to_json(shape_file, grid, tree, output_json='./data/pyshp-all-2000-sentinel-new-json'):
