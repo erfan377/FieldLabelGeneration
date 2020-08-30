@@ -52,7 +52,7 @@ python train_preprocess.py
 Reference Code: [Parcel Delineation](https://github.com/sustainlab-group/ParcelDelineation)
 
 
-## Example:
-
-![Boundary label generation](https://github.com/LobellLab/field_segmentation/blob/master/notebooks/viz_crf_overlap/11005880_bound.png)
-![Area label generation](https://github.com/LobellLab/field_segmentation/blob/master/notebooks/viz_crf_overlap/11005880.png)
+## Example:  
+![Overlay label generation](https://github.com/erfan377/FieldLabelGeneration/blob/master/ex_overlay.jpeg)
+![Boundary label generation](https://github.com/erfan377/FieldLabelGeneration/blob/master/ex_boundry.png)
+![Area label generation](https://github.com/erfan377/FieldLabelGeneration/blob/master/ex_area.png)
