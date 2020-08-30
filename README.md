@@ -49,9 +49,10 @@ python split_data.py
 python train_preprocess.py
 ```
 
+Reference Code: [Parcel Delineation](https://github.com/sustainlab-group/ParcelDelineation)
+
+
 ## Example:
 
 ![Boundary label generation](https://github.com/LobellLab/field_segmentation/blob/master/notebooks/viz_crf_overlap/11005880_bound.png)
 ![Area label generation](https://github.com/LobellLab/field_segmentation/blob/master/notebooks/viz_crf_overlap/11005880.png)
-
-Reference Code: [Parcel Delineation](https://github.com/sustainlab-group/ParcelDelineation)
